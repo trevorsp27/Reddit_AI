@@ -11,37 +11,37 @@ from datasets import Dataset
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Load and clean data
+#load and clean data
 df = pd.read_csv("C:/Users/tspin/OneDrive/Desktop/reddit_AI/reddit_posts_labeled_clean.csv")
 
-# Drop rows with missing title, body, or reliable values
+#drop rows with missing info
 df = df.dropna(subset=["title", "body", "reliable"])
 
-# Fix any weird formatting in 'reliable' column (e.g., stringified objects)
+#fix any weird formatting
 df['reliable'] = df['reliable'].astype(str).str.extract(r'(True|False)', expand=False).map({'True': 1, 'False': 0})
 
-# Drop rows with invalid labels
+#invalid labels
 df = df[df['reliable'].isin([0, 1])]
 df['label'] = df['reliable'].astype(int)
 
-# Combine title and body
+#combine title and body
 df['text'] = df['title'].astype(str) + " " + df['body'].astype(str)
 
-# Split into train/test using the full dataset
+#split into train/test using the full dataset
 train_texts, test_texts, train_labels, test_labels = train_test_split(
-    df["text"].tolist(), # Use full 'text' column
-    df["label"].tolist(), # Use full 'label' column
+    df["text"].tolist(), #full text column
+    df["label"].tolist(), #full label column
     test_size=0.2,
-    stratify=df["label"], # Stratify based on full labels
+    stratify=df["label"], #stratify based on full labels
     random_state=42
 )
 
-# Tokenize using BertTokenizerFast
+#tokenize 
 tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
 train_encodings = tokenizer(train_texts, truncation=True, padding=True)
 test_encodings = tokenizer(test_texts, truncation=True, padding=True)
 
-# Convert to torch dataset
+#convert to torch dataset
 class RedditDataset(torch.utils.data.Dataset):
     def __init__(self, encodings, labels):
         self.encodings = encodings
@@ -56,27 +56,26 @@ class RedditDataset(torch.utils.data.Dataset):
 train_dataset = RedditDataset(train_encodings, train_labels)
 test_dataset = RedditDataset(test_encodings, test_labels)
 
-# Manually set class weights
+#manually set class weights
 class_weights = torch.tensor([0.8, 1.3], dtype=torch.float)
 
 print(f"Using Manual Class Weights: {class_weights}")
 
-# Define WeightedTrainer
 class WeightedTrainer(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None): # Add num_items_in_batch
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None): #add num_items_in_batch
         labels = inputs.pop("labels")
         outputs = model(**inputs)
         logits = outputs.logits
-        # Move class_weights to the same device as logits
+        #move class_weights to the same device as logits
         weights = class_weights.to(logits.device)
         loss_fct = torch.nn.CrossEntropyLoss(weight=weights)
         loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
 
-# Load model
+#model
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2)
 
-# Training arguments
+#training arguments
 training_args = TrainingArguments(
     output_dir="./results",
     num_train_epochs=5,
@@ -86,40 +85,38 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     logging_dir="./logs",
     logging_steps=10,
-    evaluation_strategy="epoch", # Evaluate every epoch
-    save_strategy="epoch",       # Save checkpoint every epoch
-    load_best_model_at_end=True, # Load the best model based on evaluation
-    metric_for_best_model="eval_loss", # Use eval loss to determine the best model
-    greater_is_better=False      # Lower eval loss is better
+    evaluation_strategy="epoch", #evaluate every epoch
+    save_strategy="epoch",       #save checkpoint every epoch
+    load_best_model_at_end=True, #load the best model based on evaluation
+    metric_for_best_model="eval_loss", #use eval loss to determine the best model
+    greater_is_better=False      #lower eval loss is better
 )
 
-# Initialize Trainer with WeightedTrainer
-trainer = WeightedTrainer( # Use the custom WeightedTrainer
+trainer = WeightedTrainer( #use the custom WeightedTrainer
     model=model,
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=test_dataset,
-    tokenizer=tokenizer, # Pass tokenizer
-    # class_weights are now handled inside WeightedTrainer's compute_loss
+    tokenizer=tokenizer, #pass tokenizer
+    #class_weights are handled inside compute_loss
 )
 
-# Train the model
+#train  model
 trainer.train()
 
-# Evaluate the model
+#evaluate model
 predictions = trainer.predict(test_dataset)
 predicted_labels = np.argmax(predictions.predictions, axis=1)
 
-# Print classification report
+#classification report
 print("Classification Report:")
 print(classification_report(test_labels, predicted_labels))
 
-# Plot confusion matrix
+#confusion matrix
 cm = confusion_matrix(test_labels, predicted_labels)
 sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=[0, 1], yticklabels=[0, 1])
 plt.xlabel("Predicted")
 plt.ylabel("Actual")
 plt.title("Confusion Matrix")
-plt.savefig("confusion_matrix_distil_manual_08_13.png") # Save the plot
+plt.savefig("confusion_matrix_distil_manual_08_13.png")
 print("Confusion matrix saved to confusion_matrix_distil_manual_08_13.png")
-# plt.show() # Optionally display the plot

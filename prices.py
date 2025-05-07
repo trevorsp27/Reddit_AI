@@ -5,13 +5,12 @@ import ast
 import re
 import json
 
-# === Load real tickers ===
+#load real tickers
 with open("company_tickers.json") as f:
     ticker_data = json.load(f)
     VALID_TICKERS = {v["ticker"].upper() for v in ticker_data.values()}
 
 def clean_tickers(ticker_list):
-    """Filter valid US-style stock tickers only."""
     clean = []
     for t in ticker_list:
         t = t.strip().upper()
@@ -33,7 +32,7 @@ def get_price_change(ticker, post_date):
         percent_change = ((price_after - price_before) / price_before) * 100
         return round(percent_change, 2)
     except Exception as e:
-        print(f"[⚠️] Error fetching {ticker}: {e}")
+        print(f"error fetching {ticker}: {e}")
         return None
 
 def enrich_data(input_csv, output_csv):
@@ -63,17 +62,16 @@ def enrich_data(input_csv, output_csv):
             else:
                 skipped.append((row['id'], main_ticker))
         except Exception as e:
-            print(f"[⚠️] Row error ({row['id']}): {e}")
+            print(f"row error ({row['id']}): {e}")
             skipped.append((row['id'], 'Error'))
 
     df_cleaned = df.dropna(subset=['price_change'])
     df_cleaned.to_csv(output_csv, index=False)
 
-    print(f"\n✅ Cleaned data saved to {output_csv}")
-    print(f"❌ Skipped {len(skipped)} posts due to invalid tickers or missing price data")
+    print(f"cleaned data saved to {output_csv}")
+    print(f"skkipped {len(skipped)} posts due to invalid tickers or missing price data")
     if skipped:
-        print("Examples:", skipped[:5])
+        print("examples:", skipped[:5])
 
-# Run it
 if __name__ == "__main__":
     enrich_data("reddit_posts_large.csv", "reddit_posts_labeled_clean.csv")

@@ -5,30 +5,30 @@ from sklearn.metrics import classification_report
 from transformers import DistilBertTokenizerFast, DistilBertForSequenceClassification, Trainer, TrainingArguments
 from datasets import Dataset
 
-# Load your dataset
+#load data
 df = pd.read_csv("C:/Users/tspin/OneDrive/Desktop/reddit_AI/reddit_posts_labeled_clean.csv")
 
-# Drop any rows with missing values in relevant columns
+#clean data
 df = df.dropna(subset=['body', 'reliable'])
 
-# Ensure 'reliable' is a clean boolean or integer
+#reliable or unreliable 0/1
 if df['reliable'].dtype == object:
     df['reliable'] = df['reliable'].astype(str).str.extract(r'(True|False)', expand=False)
     df['reliable'] = df['reliable'].map({'True': 1, 'False': 0})
 else:
     df['reliable'] = df['reliable'].astype(int)
 
-# Rename columns to match Hugging Face conventions
+#rename columns to match hugging face
 df = df.rename(columns={'body': 'text', 'reliable': 'label'})
 
-# Convert to Dataset
+#convert to hugging face dataset
 hf_dataset = Dataset.from_pandas(df[['text', 'label']])
 
-# Tokenizer and model
+#tokenizer and model
 tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=2)
 
-# Tokenize dataset
+#tokenize dataset
 def tokenize_function(example):
     return tokenizer(example['text'], padding="max_length", truncation=True)
 
@@ -49,7 +49,7 @@ training_args = TrainingArguments(
     logging_steps=10,
 )
 
-# Define Trainer
+#define training
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -57,10 +57,10 @@ trainer = Trainer(
     eval_dataset=tokenized_datasets["test"]
 )
 
-# Train the model
+#train model
 trainer.train()
 
-# Evaluate the model
+#eval
 predictions = trainer.predict(tokenized_datasets["test"])
 preds = predictions.predictions.argmax(axis=1)
 print("\nClassification Report:")

@@ -5,10 +5,9 @@ from datetime import datetime
 from tqdm import tqdm
 import time
 
-# === Reddit API Setup ===
+#reddit API
 reddit = praw.Reddit()
 
-# === Settings ===
 subreddits_to_scrape = [
     "pennystocks", "stocks", "wallstreetbets",
     "investing", "StockMarket", "options", "RobinHoodPennyStocks"
@@ -16,11 +15,10 @@ subreddits_to_scrape = [
 posts_per_subreddit = 1000
 output_file = "reddit_posts_large.csv"
 
-# === Ticker Extraction ===
 def extract_tickers(text):
     return re.findall(r'\b[A-Z]{2,5}\b', text)
 
-# === Main Scraper Function ===
+#scraper
 def scrape_reddit_posts(subreddit_name, limit):
     posts = []
     print(f"\n🔍 Scraping r/{subreddit_name}...")
@@ -48,21 +46,21 @@ def scrape_reddit_posts(subreddit_name, limit):
                 "tickers": list(set(tickers))
             })
 
-            time.sleep(0.1)  # Be nice to Reddit's API
+            time.sleep(0.1)  #reddit API needs time to load
 
     except Exception as e:
-        print(f"❌ Failed to scrape r/{subreddit_name}: {e}")
+        print(f"failed to scrape r/{subreddit_name}: {e}")
 
     return posts
 
-# === Run Scraper ===
+#run
 all_posts = []
 
 for sub in subreddits_to_scrape:
     posts = scrape_reddit_posts(sub, limit=posts_per_subreddit)
     all_posts.extend(posts)
 
-# === Save to CSV ===
+#save to file
 df = pd.DataFrame(all_posts).drop_duplicates(subset=["id"])
 df.to_csv(output_file, index=False)
-print(f"\n✅ Saved {len(df)} posts to {output_file}")
+print(f"saved {len(df)} posts to {output_file}")
